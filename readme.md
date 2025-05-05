@@ -7,7 +7,7 @@
 ![Docker](https://img.shields.io/badge/Docker-20.10%2B-blue)
 ![GitHub](https://img.shields.io/badge/GitHub-Repo-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![GitHub contributors](https://img.shields.io/github/contributors/usuario/repositorio)
+![GitHub contributors](https://img.shields.io/github/contributors/DanielE0802/taskly-api)
 
 Este proyecto es una API construida con **FastAPI**, **SQLAlchemy** y **MySQL**. A continuación, se detallan los pasos necesarios para comenzar con el proyecto, configurarlo correctamente y empezar a trabajar en él.
 
