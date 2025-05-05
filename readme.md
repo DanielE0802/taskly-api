@@ -24,8 +24,8 @@ Antes de comenzar, asegúrate de tener instalados los siguientes programas:
 Clona el repositorio en tu máquina local:
 
 ```bash
-git clone https://github.com/usuario/repositorio.git
-cd repositorio
+git clone https://github.com/DanielE0802/taskly-api
+cd taskly-api
 ```
 
 ## Crear un Entorno Virtual
