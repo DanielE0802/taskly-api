@@ -26,19 +26,56 @@ def get_db_connection():
     except mysql.connector.Error as err:
         raise Exception(f"Error al conectar con la base de datos: {err}")
 
-def execute_query(query: str, params: tuple = ()):
-    """Ejecuta una consulta SQL y devuelve el resultado."""
+def execute_query(
+    query: str,
+    params: tuple = (),
+    fetchone: bool = False,
+    fetchall: bool = False,
+    commit: bool = False,
+    fetch_lastrowid: bool = False
+):
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True) # type: ignore
+    cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(query, params)
-        result = cursor.fetchall()  # Obtener todos los resultados
+
+        if commit:
+            conn.commit()
+
+        if fetch_lastrowid:
+            last_id = cursor.lastrowid
+            # Limpieza por seguridad
+            while cursor.nextset():
+                pass
+            return last_id
+
+        if fetchone:
+            result = cursor.fetchone()
+        elif fetchall:
+            result = cursor.fetchall()
+        else:
+            # Para evitar "Unread result found" si no se especifica fetch
+            cursor.fetchall()
+            result = None
+
+        # Consumir cualquier resultado adicional
+        while cursor.nextset():
+            pass
+
         return result
+
     except mysql.connector.Error as err:
         raise Exception(f"Error al ejecutar la consulta: {err}")
     finally:
-        cursor.close()
-        conn.close()
+        try:
+            cursor.close()
+        except:
+            pass
+        try:
+            conn.close()
+        except:
+            pass
+
 
 def execute_update(query: str, params: tuple = ()):
     """Ejecuta una consulta SQL que no devuelve resultados (como INSERT, UPDATE, DELETE)."""

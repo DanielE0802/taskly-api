@@ -1,32 +1,35 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from passlib.context import CryptContext
 import uuid
 import jwt
 from datetime import datetime, timedelta
 from database import execute_query, execute_update
 from auth.utils import hash_password, verify_password, create_access_token
+from auth import models
 
 router = APIRouter()
 
 # Ruta de registro de usuario
 @router.post("/register")
-def register_user(username: str, email: str, password: str):
-    # Verificar si el usuario ya existe
-    query = "SELECT * FROM users WHERE username = %s"
-    existing_user = execute_query(query, (username,))
+def register_user(user: models.UserRegister):
+    query = "SELECT * FROM Usuario WHERE correo_usuario = %s"
+    existing_user = execute_query(query, (user.correo_usuario,))
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Verificar si el nombre de usuario ya existe
+    query = "SELECT * FROM Usuario WHERE nombre_usuario = %s"
+    existing_user = execute_query(query, (user.nombre_usuario,))
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    # Generar un UUID para el usuario
-    id = str(uuid.uuid4())
-
     # Hashear la contraseña
-    hashed_password = hash_password(password)
+    hashed_password = hash_password(user.clave_usuario)
 
     # Insertar el usuario en la base de datos
-    query = "INSERT INTO users (id, username, email, hashed_password) VALUES (%s, %s, %s, %s)"
+    query = "INSERT INTO Usuario (id_usuario, nombre_usuario, correo_usuario, clave_usuario) VALUES (%s, %s, %s, %s)"
     try:
-        execute_update(query, (id, username, email, hashed_password))
+        execute_update(query, (None, user.nombre_usuario, user.correo_usuario, hashed_password))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -34,14 +37,11 @@ def register_user(username: str, email: str, password: str):
 
 # Ruta de login
 @router.post("/login")
-def login_for_access_token(username: str, password: str):
-    # Buscar el usuario en la base de datos
-    query = "SELECT * FROM users WHERE username = %s"
-    user = execute_query(query, (username,))
+def login_for_access_token(user: models.UserLogin):
+    query = "SELECT * FROM Usuario WHERE correo_usuario = %s"
+    db_user = execute_query(query, (user.correo_usuario,), fetchone=True)
+    if not db_user or not verify_password(user.clave_usuario, db_user['clave_usuario']):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    token = create_access_token({"sub": db_user["correo_usuario"]})
+    return {"access_token": token, "token_type": "bearer"}
 
-    if not user or not verify_password(password, user[0]["hashed_password"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # Crear el token JWT
-    access_token = create_access_token(data={"sub": user[0]["username"]})
-    return {"access_token": access_token, "token_type": "bearer"}

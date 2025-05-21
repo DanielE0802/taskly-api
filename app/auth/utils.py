@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Request, status
 from fastapi.security.http import HTTPAuthorizationCredentials
+from database import execute_query
 
 load_dotenv()
 
@@ -59,6 +60,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
+    # send user id in the token
+    
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -74,3 +77,12 @@ class BearerJWT(HTTPBearer):
         
         verify_token(credentials.credentials)
         return credentials
+    
+def get_current_user_id(token: str):
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    query = "SELECT id_usuario FROM Usuario WHERE correo_usuario = %s"
+    result = execute_query(query, (payload.get("sub"),), fetchone=True)
+    if result is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user_id = result["id_usuario"]
+    return user_id

@@ -40,24 +40,13 @@
 
 from pydantic import BaseModel
 from typing import Optional
+from typing import List
 
 class Usuario(BaseModel):
     id_usuario: Optional[int]
     nombre_usuario: Optional[str]
     correo_usuario: str
     clave_usuario: str
-
-class Proyecto(BaseModel):
-    id_proyecto: Optional[int]
-    nombre_proyecto: str
-    descripcion_proyecto: Optional[str]
-    id_usuario: Optional[int]
-
-class UsuarioProyecto(BaseModel):
-    id_usuario_proyecto: Optional[int]
-    id_usuario: int
-    id_proyecto: int
-    rol_usuario_proyecto: Optional[str]
 
 class Tarea(BaseModel):
     id_tarea: Optional[int]
@@ -75,3 +64,24 @@ class HistorialTarea(BaseModel):
     estado_nuevo_historial_tarea: str
     fecha_cambio_historial_tarea: Optional[str]
     id_usuario: int
+class UserRegister(BaseModel):
+    """
+    Modelo para el registro de un nuevo usuario.
+    """
+    nombre_usuario: str
+    correo_usuario: str
+    clave_usuario: str
+
+class UserLogin(BaseModel):
+    """
+    Modelo para el inicio de sesión de un usuario.
+    """
+    correo_usuario: str
+    clave_usuario: str
+
+class Token(BaseModel):
+    """
+    Modelo para el token de acceso.
+    """
+    access_token: str
+    token_type: str = "bearer"
