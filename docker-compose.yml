@@ -7,8 +7,10 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./mysql/db:/docker-entrypoint-initdb.d
+      - ./mysql/db:/docker-entrypoint-initdb.d:ro
       - ./mysql/conf.d:/etc/mysql/conf.d
+      - ./mysql/mysql-data:/var/lib/mysql
+
     env_file:
       - ./mysql/local.env
     tty: true
@@ -19,12 +21,15 @@ services:
     platform: linux/x86_64
     build:
       context: ./app
-      dockerfile: dev.Dockerfile
+      dockerfile: debugger.Dockerfile
     restart: unless-stopped
+    environment:
+      - DEBUG=true
     tty: true
     volumes:
       - ./app:/app
     ports:
       - 8000:8000
+      - 5678:5678
     env_file:
       - ./app/local.env
