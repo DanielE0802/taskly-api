@@ -3,30 +3,9 @@ from fastapi.security.http import HTTPAuthorizationCredentials
 from auth.utils import BearerJWT, get_current_user_id
 from database import execute_query, execute_update
 from tasks.models import TareaCreate, TareaOut, TareaUpdate
-from tasks.utils import check_user_in_project
-from typing import Optional, List, Dict, Any
+from tasks.utils import check_user_in_project, build_task_response
+from typing import Optional, List
 task_router = APIRouter()
-
-def build_task_response(tarea: Dict[str, Any]) -> Dict[str, Any]:
-    """Construye la respuesta de una tarea con información de usuario y responsable."""
-    return {
-        "id_tarea": tarea["id_tarea"],
-        "titulo_tarea": tarea["titulo_tarea"],
-        "descripcion_tarea": tarea["descripcion_tarea"],
-        "estado_tarea": tarea["estado_tarea"],
-        "fecha_limite_tarea": tarea["fecha_limite_tarea"],
-        "id_proyecto": tarea["id_proyecto"],
-        "usuario": {
-            "id_usuario": tarea["id_usuario"],
-            "nombre": tarea["nombre_usuario_creador"]
-        },
-        "responsable": {
-            "id_usuario": tarea["id_responsable"],
-            "nombre": tarea["nombre_usuario_responsable"]
-        } if tarea["id_responsable"] else None,
-        "id_usuario": tarea["id_usuario"],
-        "id_responsable": tarea["id_responsable"]
-    }
 
 @task_router.get("", response_model=List[TareaOut], dependencies=[Depends(BearerJWT())])
 def get_all_tasks(
@@ -61,9 +40,9 @@ def get_all_tasks(
         query = base_query + " WHERE t.id_usuario = %s"
         params = (user_id,)
     tareas = execute_query(query, params, fetchall=True)
-    if not tareas:
+    if not tareas or not isinstance(tareas, list):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No tasks found")
-    return {"tasks": [build_task_response(t) for t in tareas]}
+    return [build_task_response(t) for t in tareas]
 
 @task_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(BearerJWT())])
 def create_task(

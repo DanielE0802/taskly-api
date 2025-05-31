@@ -1,92 +1,79 @@
 import os
 import mysql.connector
+from mysql.connector import Error, MySQLConnection
+from mysql.connector.connection_cext import CMySQLConnection
 from dotenv import load_dotenv
+from typing import Any, List, Optional, Union
 
 load_dotenv()
 
-# Configuración de la base de datos desde variables de entorno
-DB_NAME = os.getenv("DATABASE", "tasklydb")
-DB_HOST = os.getenv("DATABASE_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "3306")
-DB_USER = os.getenv("DATABASE_USERNAME", "root")
-DB_PASSWORD = os.getenv("DATABASE_PASSWORD", "root")
-DB_DATABASE = os.getenv("DATABASE", "tasklydb")
+DB_CONFIG = {
+    "host": os.getenv("DATABASE_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "3306")),
+    "user": os.getenv("DATABASE_USERNAME", "root"),
+    "password": os.getenv("DATABASE_PASSWORD", "root"),
+    "database": os.getenv("DATABASE", "tasklydb"),
+}
 
 def get_db_connection():
-    """Establece una conexión a la base de datos MySQL."""
+    """
+    Crea y devuelve una conexión a la base de datos MySQL.
+    Lanza RuntimeError en caso de fallo.
+    """
     try:
-        conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_DATABASE,
-            port=DB_PORT
-        )
-        return conn
-    except mysql.connector.Error as err:
-        raise Exception(f"Error al conectar con la base de datos: {err}")
+        return mysql.connector.connect(**DB_CONFIG)
+    except Error as err:
+        raise RuntimeError(f"Error al conectar con la base de datos: {err}")
 
 def execute_query(
     query: str,
-    params: tuple = (),
+    params: Optional[tuple[Any, ...]] = None,
+    *,
     fetchone: bool = False,
     fetchall: bool = False,
     commit: bool = False,
-    fetch_lastrowid: bool = False
+    return_lastrowid: bool = False
 ):
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    """
+    Ejecuta una consulta SQL según los flags:
+      - fetchone: devuelve un dict con una fila
+      - fetchall: devuelve una lista de dicts
+      - commit: hace commit (para INSERT/UPDATE/DELETE)
+      - return_lastrowid: devuelve cursor.lastrowid
+    En caso de error lanza RuntimeError.
+    """
+    params = params or ()
+    result = None
+
     try:
-        cursor.execute(query, params)
+        with get_db_connection() as conn:
+            with conn.cursor(dictionary=True) as cursor:
+                cursor.execute(query, params)
 
-        if commit:
-            conn.commit()
+                if commit:
+                    conn.commit()
 
-        if fetch_lastrowid:
-            last_id = cursor.lastrowid
-            # Limpieza por seguridad
-            while cursor.nextset():
-                pass
-            return last_id
+                if return_lastrowid:
+                    result = cursor.lastrowid
+                elif fetchone:
+                    result = cursor.fetchone()
+                elif fetchall:
+                    result = cursor.fetchall()
 
-        if fetchone:
-            result = cursor.fetchone()
-        elif fetchall:
-            result = cursor.fetchall()
-        else:
-            # Para evitar "Unread result found" si no se especifica fetch
-            cursor.fetchall()
-            result = None
+    except Error as err:
+        raise RuntimeError(f"Error al ejecutar la consulta: {err}")
 
-        # Consumir cualquier resultado adicional
-        while cursor.nextset():
-            pass
-
-        return result
-
-    except mysql.connector.Error as err:
-        raise Exception(f"Error al ejecutar la consulta: {err}")
-    finally:
-        try:
-            cursor.close()
-        except:
-            pass
-        try:
-            conn.close()
-        except:
-            pass
+    return result
 
 
-def execute_update(query: str, params: tuple = ()):
-    """Ejecuta una consulta SQL que no devuelve resultados (como INSERT, UPDATE, DELETE)."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+def execute_update(query: str, params: tuple[Any, ...] = ()) -> None:
+    """
+    Ejecuta un INSERT/UPDATE/DELETE y confirma la transacción.
+    """
     try:
-        cursor.execute(query, params)
-        conn.commit()
-    except mysql.connector.Error as err:
-        conn.rollback()
-        raise Exception(f"Error al ejecutar la consulta de actualización: {err}")
-    finally:
-        cursor.close()
-        conn.close()
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query, params)
+                conn.commit()
+    except Error as err:
+        raise RuntimeError(f"Error al ejecutar la consulta de actualización: {err}")
