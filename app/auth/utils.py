@@ -1,5 +1,4 @@
 from fastapi import HTTPException
-from fastapi.security import OAuth2PasswordBearer
 import jwt
 import os
 from dotenv import load_dotenv
@@ -20,8 +19,11 @@ SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-# Verificación del token JWT
 def verify_token(token: str):
+    """
+    Verifica el token JWT y devuelve el payload si es válido.
+    Si el token es inválido o ha expirado, lanza una excepción HTTP.
+    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -66,7 +68,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 class BearerJWT(HTTPBearer):
-    """Custom HTTPBearer class to handle JWT authentication."""
+    """
+    Custom HTTPBearer class to handle JWT authentication.
+    This class overrides the __call__ method to verify the JWT token.
+    """
     async def __call__(self, request: Request) -> HTTPAuthorizationCredentials:
         auth = await super().__call__(request)
         if not auth or not isinstance(auth.credentials, str):
@@ -79,6 +84,9 @@ class BearerJWT(HTTPBearer):
         return credentials
     
 def get_current_user_id(token: str):
+    """
+    Obtiene el ID del usuario actual a partir del token JWT.
+    """
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     query = "SELECT id_usuario FROM Usuario WHERE correo_usuario = %s"
     result = execute_query(query, (payload.get("sub"),), fetchone=True)

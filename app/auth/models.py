@@ -3,6 +3,10 @@ from typing import Optional
 from typing import List
 
 class Usuario(BaseModel):
+    """
+    Modelo para representar un usuario en el sistema.
+    Contiene información básica del usuario como ID, nombre, correo y clave.
+    """
     id_usuario: Optional[int]
     nombre_usuario: Optional[str]
     correo_usuario: str

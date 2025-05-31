@@ -34,12 +34,12 @@ def register_user(user: models.UserRegister):
 
 # Ruta de login
 @router.post("/login")
-def login_for_access_token(user: models.UserLogin):
+def login_for_access_token(user: models.UserLogin) -> models.Token:
     """Inicia sesión y devuelve un token de acceso."""
     query = "SELECT * FROM Usuario WHERE correo_usuario = %s"
     db_user = execute_query(query, (user.correo_usuario,), fetchone=True)
     if not db_user or not verify_password(user.clave_usuario, db_user['clave_usuario']):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = create_access_token({"sub": db_user["correo_usuario"]})
-    return {"access_token": token, "token_type": "bearer"}
+    return models.Token(access_token=token, token_type="bearer")
 
