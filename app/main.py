@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from tasks.routes import task_router
 from projects.routes import router as project_router
 from tasks.task_by_project_routes import router as task_by_project_router
+from users.routes import users_router
 
 app = FastAPI(
     title="Taskly API",
@@ -26,6 +27,7 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(task_router, prefix="/tasks", tags=["tasks"])
 app.include_router(project_router, prefix="/projects", tags=["projects"])
 app.include_router(task_by_project_router, prefix="/tasks", tags=["tasks by projects"])
+app.include_router(users_router, prefix="/users", tags=["users"])
 
 @app.get("/")
 def read_root():

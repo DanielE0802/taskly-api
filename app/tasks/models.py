@@ -12,6 +12,14 @@ class TareaBase(BaseModel):
     def serialize_fecha_limite(self, value: datetime) -> str:
         return value.strftime("%Y-%m-%d %H:%M:%S")
 
+class HistorialTarea(BaseModel):
+    id_historial_tarea: Optional[int]
+    id_tarea: int
+    estado_anterior_historial_tarea: Optional[str]
+    estado_nuevo_historial_tarea: str
+    fecha_cambio_historial_tarea: Optional[str]
+    id_usuario: int
+
 class UsuarioOut(BaseModel):
     id_usuario: int
     nombre: Optional[str]
@@ -20,7 +28,9 @@ class ResponsableOut(BaseModel):
     id_usuario: Optional[int] = None
     nombre: Optional[str] = None
 class TareaCreate(TareaBase):
-    pass
+    id_proyecto: int
+    id_usuario: int
+    id_responsable: Optional[int] = None
 
 class TareaUpdate(BaseModel):
     titulo_tarea: Optional[str] = None

@@ -1,8 +1,4 @@
 from fastapi import APIRouter, HTTPException, Depends, status
-from passlib.context import CryptContext
-import uuid
-import jwt
-from datetime import datetime, timedelta
 from database import execute_query, execute_update
 from auth.utils import hash_password, verify_password, create_access_token
 from auth import models
@@ -12,6 +8,7 @@ router = APIRouter()
 # Ruta de registro de usuario
 @router.post("/register")
 def register_user(user: models.UserRegister):
+    """Registra un nuevo usuario en la base de datos."""
     query = "SELECT * FROM Usuario WHERE correo_usuario = %s"
     existing_user = execute_query(query, (user.correo_usuario,))
     if existing_user:
@@ -38,6 +35,7 @@ def register_user(user: models.UserRegister):
 # Ruta de login
 @router.post("/login")
 def login_for_access_token(user: models.UserLogin):
+    """Inicia sesión y devuelve un token de acceso."""
     query = "SELECT * FROM Usuario WHERE correo_usuario = %s"
     db_user = execute_query(query, (user.correo_usuario,), fetchone=True)
     if not db_user or not verify_password(user.clave_usuario, db_user['clave_usuario']):

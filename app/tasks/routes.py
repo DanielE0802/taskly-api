@@ -1,78 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
-from fastapi.security import HTTPBearer
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security.http import HTTPAuthorizationCredentials
-from auth import schemas , utils
 from auth.utils import BearerJWT, get_current_user_id
-from fastapi import APIRouter, HTTPException
 from database import execute_query, execute_update
-import auth.models as models
 from tasks.models import TareaCreate, TareaOut, TareaUpdate
-
+from tasks.utils import check_user_in_project
+from typing import Optional, List, Dict, Any
 task_router = APIRouter()
 
-def check_user_in_project(id_proyecto: int, user_id: int):
-    query = "SELECT * FROM usuario_proyecto WHERE id_proyecto = %s AND id_usuario = %s"
-    result = execute_query(query, (id_proyecto, user_id), fetchone=True)
-    if not result:
-        raise HTTPException(status_code=403, detail="No tienes acceso a este proyecto")
-
-
-@task_router.get("", dependencies=[Depends(utils.BearerJWT())])
-def get_all_tasks(credentials: HTTPAuthorizationCredentials = Depends(utils.BearerJWT())):
-    # get bearer token for authentication and get all tasks by user
-    user_id = utils.get_current_user_id(credentials.credentials)
-    print(user_id)
-    query = "SELECT * FROM Tarea WHERE id_usuario = %s"
-    tasks = execute_query(query, (user_id,))
-    if not tasks:
-        raise HTTPException(status_code=404, detail="No tasks found")
-    return {"tasks": tasks}
-
-# Ruta para crear una tarea
-@task_router.post("/", dependencies=[Depends(utils.BearerJWT())])
-def create_task(data: models.Tarea, credentials: HTTPAuthorizationCredentials = Depends(utils.BearerJWT())):
-    user_id = utils.get_current_user_id(credentials.credentials)
-    query = """
-        INSERT INTO Tarea (titulo_tarea, descripcion_tarea, estado_tarea, fecha_limite_tarea, id_proyecto, id_usuario)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """
-    try:
-        execute_update(query, (data.titulo_tarea, data.descripcion_tarea, data.estado_tarea, data.fecha_limite_tarea, data.id_proyecto, user_id))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    return {"message": "Task created successfully"}
-
-# Listo ✅
-@task_router.get("/{id_tarea}", response_model=TareaOut)
-def get_tarea(id_tarea: int, credentials: HTTPAuthorizationCredentials = Depends(BearerJWT())):
-    user_id = utils.get_current_user_id(credentials.credentials)
-    query = """
-    SELECT
-        t.id_tarea,
-        t.titulo_tarea,
-        t.descripcion_tarea,
-        t.estado_tarea,
-        t.fecha_limite_tarea,
-        t.id_usuario,
-        c.nombre_usuario AS nombre_usuario_creador,
-        t.id_responsable,
-        r.nombre_usuario AS nombre_usuario_responsable,
-        t.id_proyecto
-    FROM tarea t
-    LEFT JOIN usuario c ON t.id_usuario = c.id_usuario
-    LEFT JOIN usuario r ON t.id_responsable = r.id_usuario
-    WHERE t.id_tarea = %s"""
-    print("hola")
-    tarea = execute_query(query, (id_tarea,), fetchone=True)
-    if not tarea:
-        raise HTTPException(status_code=404, detail="Tarea no encontrada")
-    
-    # Verificar acceso al proyecto
-    check_user_in_project(tarea["id_proyecto"], user_id)
-    
-    result = {
+def build_task_response(tarea: Dict[str, Any]) -> Dict[str, Any]:
+    """Construye la respuesta de una tarea con información de usuario y responsable."""
+    return {
         "id_tarea": tarea["id_tarea"],
         "titulo_tarea": tarea["titulo_tarea"],
         "descripcion_tarea": tarea["descripcion_tarea"],
@@ -91,16 +28,114 @@ def get_tarea(id_tarea: int, credentials: HTTPAuthorizationCredentials = Depends
         "id_responsable": tarea["id_responsable"]
     }
 
-    return result
+@task_router.get("", response_model=List[TareaOut], dependencies=[Depends(BearerJWT())])
+def get_all_tasks(
+    credentials: HTTPAuthorizationCredentials = Depends(BearerJWT()),
+    id_proyecto: Optional[int] = Query(None, description="Filtrar por id_proyecto")
+):
+    """
+    Obtiene todas las tareas asociadas al usuario actual.
+    Si se proporciona un id_proyecto, filtra las tareas por ese proyecto.
+    """
+    user_id = get_current_user_id(credentials.credentials)
+    base_query = """
+        SELECT
+            t.id_tarea,
+            t.titulo_tarea,
+            t.descripcion_tarea,
+            t.estado_tarea,
+            t.fecha_limite_tarea,
+            t.id_usuario,
+            c.nombre_usuario AS nombre_usuario_creador,
+            t.id_responsable,
+            r.nombre_usuario AS nombre_usuario_responsable,
+            t.id_proyecto
+        FROM Tarea t
+        LEFT JOIN Usuario c ON t.id_usuario = c.id_usuario
+        LEFT JOIN Usuario r ON t.id_responsable = r.id_usuario
+    """
+    if id_proyecto is not None:
+        query = base_query + " WHERE t.id_usuario = %s AND t.id_proyecto = %s"
+        params = (user_id, id_proyecto)
+    else:
+        query = base_query + " WHERE t.id_usuario = %s"
+        params = (user_id,)
+    tareas = execute_query(query, params, fetchall=True)
+    if not tareas:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No tasks found")
+    return {"tasks": [build_task_response(t) for t in tareas]}
 
-# Listo ✅
+@task_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(BearerJWT())])
+def create_task(
+    data: TareaCreate,
+    credentials: HTTPAuthorizationCredentials = Depends(BearerJWT())
+):
+    """
+    Crea una nueva tarea en la base de datos, asociada al usuario actual y al proyecto especificado.
+    """
+    user_id = get_current_user_id(credentials.credentials)
+    check_user_in_project(data.id_proyecto, user_id)
+
+    query = """
+        INSERT INTO tarea (titulo_tarea, descripcion_tarea, estado_tarea, fecha_limite_tarea, id_proyecto, id_usuario)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """
+    try:
+        execute_update(
+            query,
+            (
+                data.titulo_tarea,
+                data.descripcion_tarea,
+                data.estado_tarea,
+                data.fecha_limite_tarea,
+                data.id_proyecto,
+                user_id
+            )
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    return {"message": "Task created successfully"}
+
+@task_router.get("/{id_tarea}", response_model=TareaOut)
+def get_tarea(
+    id_tarea: int,
+    credentials: HTTPAuthorizationCredentials = Depends(BearerJWT())
+):
+    """
+    Obtiene los detalles de una tarea específica por su ID y verifica el acceso del usuario al proyecto asociado.
+    """
+    user_id = get_current_user_id(credentials.credentials)
+    query = """
+        SELECT
+            t.id_tarea,
+            t.titulo_tarea,
+            t.descripcion_tarea,
+            t.estado_tarea,
+            t.fecha_limite_tarea,
+            t.id_usuario,
+            c.nombre_usuario AS nombre_usuario_creador,
+            t.id_responsable,
+            r.nombre_usuario AS nombre_usuario_responsable,
+            t.id_proyecto
+        FROM Tarea t
+        LEFT JOIN Usuario c ON t.id_usuario = c.id_usuario
+        LEFT JOIN Usuario r ON t.id_responsable = r.id_usuario
+        WHERE t.id_tarea = %s
+    """
+    tarea = execute_query(query, (id_tarea,), fetchone=True)
+    if not tarea:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
+    check_user_in_project(tarea["id_proyecto"], user_id)
+    return build_task_response(tarea)
+
 @task_router.patch("/{id_tarea}")
 def update_tarea(id_tarea: int, tarea: TareaUpdate, credentials: HTTPAuthorizationCredentials = Depends(BearerJWT())):
-    user_id = utils.get_current_user_id(credentials.credentials)
-    query = "SELECT * FROM tarea WHERE id_tarea = %s"
+    """Actualiza una tarea existente por su ID. Solo se actualizan los campos proporcionados en el cuerpo de la solicitud."""
+    user_id = get_current_user_id(credentials.credentials)
+    query = "SELECT * FROM Tarea WHERE id_tarea = %s"
     tarea_db = execute_query(query, (id_tarea,), fetchone=True)
     if not tarea_db:
-        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
     check_user_in_project(tarea_db["id_proyecto"], user_id)
 
     updates = []
@@ -109,22 +144,22 @@ def update_tarea(id_tarea: int, tarea: TareaUpdate, credentials: HTTPAuthorizati
         updates.append(f"{field} = %s")
         params.append(value)
     if not updates:
-        raise HTTPException(status_code=400, detail="Nada que actualizar")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nada que actualizar")
     query = f"UPDATE tarea SET {', '.join(updates)} WHERE id_tarea = %s"
     params.append(id_tarea)
     execute_query(query, tuple(params), commit=True)
-    return {"message": "Tarea actualizada"}
+    return {"message": f"Tarea {id_tarea} actualizada correctamente"}
 
-# Listo ✅
 @task_router.delete("/{id_tarea}")
 def delete_tarea(id_tarea: int, credentials: HTTPAuthorizationCredentials = Depends(BearerJWT())):
-    user_id = utils.get_current_user_id(credentials.credentials)
-    query = "SELECT * FROM tarea WHERE id_tarea = %s"
+    """Elimina una tarea por su ID. Verifica que el usuario tenga acceso al proyecto asociado."""
+    user_id = get_current_user_id(credentials.credentials)
+    query = "SELECT * FROM Tarea WHERE id_tarea = %s"
     tarea = execute_query(query, (id_tarea,), fetchone=True)
     if not tarea:
-        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
     check_user_in_project(tarea["id_proyecto"], user_id)
 
-    query = "DELETE FROM tarea WHERE id_tarea = %s"
+    query = "DELETE FROM Tarea WHERE id_tarea = %s"
     execute_query(query, (id_tarea,), commit=True)
-    return {"message": "Tarea eliminada correctamente"}
+    return {"message": f"Tarea {id_tarea} eliminada correctamente"}
