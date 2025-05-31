@@ -4,7 +4,7 @@ from users.models import User
 
 users_router = APIRouter()
 
-@users_router.get("/users", response_model=list[User])
+@users_router.get("", response_model=list[User])
 def get_users_from_project(id_proyecto: int):
     """
     Obtiene los usuarios asociados a un proyecto específico.
@@ -21,7 +21,7 @@ def get_users_from_project(id_proyecto: int):
     users = [User(id_usuario=row["id_usuario"], nombre_usuario=row["nombre_usuario"]) for row in rows]
     return users
 
-@users_router.get("/users/{id_usuario}", response_model=User)
+@users_router.get("/{id_usuario}", response_model=User)
 def get_user_by_id(id_usuario: int):
     """
     Obtiene un usuario por su ID y devuelve su nombre y proyectos asociados.
@@ -44,7 +44,7 @@ def get_user_by_id(id_usuario: int):
     proyectos = row["proyectos"].split(",") if row["proyectos"] else []
     return User(id_usuario=row["id_usuario"], nombre_usuario=row["nombre_usuario"], proyectos=proyectos)
 
-@users_router.get("/users/search", response_model=list[User])
+@users_router.get("/search", response_model=list[User])
 def search_users(name: str = Query(..., description="Nombre del usuario a buscar")):
     """
     Busca usuarios por nombre.
@@ -56,7 +56,7 @@ def search_users(name: str = Query(..., description="Nombre del usuario a buscar
     users = [User(id_usuario=row["id_usuario"], nombre_usuario=row["nombre_usuario"]) for row in rows]
     return users
 
-@users_router.post("/users", response_model=User)
+@users_router.post("", response_model=User)
 def asign_user_to_project(id_proyecto: int, id_usuario: int):
     """
     Asigna un usuario a un proyecto.
