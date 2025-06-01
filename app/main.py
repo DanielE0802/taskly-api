@@ -8,6 +8,8 @@ from tasks.routes import task_router
 from projects.routes import router as project_router
 from tasks.task_by_project_routes import router as task_by_project_router
 from users.routes import users_router
+from auth.utils import BearerJWT
+from fastapi import Depends
 
 app = FastAPI(
     title="Taskly API",
@@ -24,10 +26,10 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
-app.include_router(task_router, prefix="/tasks", tags=["Tasks"])
-app.include_router(project_router, prefix="/projects", tags=["Projects"])
-app.include_router(task_by_project_router, prefix="/tasks", tags=["Tasks By Projects"])
-app.include_router(users_router, prefix="/users", tags=["Users"])
+app.include_router(task_router, prefix="/tasks", tags=["Tasks"], dependencies=[Depends(BearerJWT())])
+app.include_router(project_router, prefix="/projects", tags=["Projects"], dependencies=[Depends(BearerJWT())])
+app.include_router(task_by_project_router, prefix="/tasks", tags=["Tasks By Projects"], dependencies=[Depends(BearerJWT())])
+app.include_router(users_router, prefix="/users", tags=["Users"], dependencies=[Depends(BearerJWT())])
 
 @app.get("/")
 def read_root():

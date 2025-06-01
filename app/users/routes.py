@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from database import execute_query
 from users.models import User
 
+# TODO: refactorizar.
+
 users_router = APIRouter()
 
 @users_router.get("", response_model=list[User])
@@ -56,7 +58,7 @@ def search_users(name: str = Query(..., description="Nombre del usuario a buscar
     users = [User(id_usuario=row["id_usuario"], nombre_usuario=row["nombre_usuario"]) for row in rows]
     return users
 
-@users_router.post("", response_model=User)
+@users_router.post("/{id_proyecto}/{id_usuario}", response_model=User, summary="Agregar usuario a un proyecto")
 def asign_user_to_project(id_proyecto: int, id_usuario: int):
     """
     Asigna un usuario a un proyecto.

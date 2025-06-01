@@ -12,3 +12,7 @@ class User(BaseModel):
     @field_serializer("nombre_usuario")
     def serialize_name(self, value: str) -> str:
         return value.strip().title()
+    
+class UsuarioProyectoCreate(BaseModel):
+    id_usuario: int
+    rol_usuario_proyecto: str
