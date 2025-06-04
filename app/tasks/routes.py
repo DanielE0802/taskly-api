@@ -44,8 +44,9 @@ def get_all_tasks(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No tasks found")
     return [build_task_response(t) for t in tareas]
 
-@task_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(BearerJWT())])
+@task_router.post("/proyecto/{id_proyecto}", status_code=status.HTTP_201_CREATED, dependencies=[Depends(BearerJWT())])
 def create_task(
+    id_proyecto: int,
     data: TareaCreate,
     credentials: HTTPAuthorizationCredentials = Depends(BearerJWT())
 ):
@@ -53,10 +54,10 @@ def create_task(
     Crea una nueva tarea en la base de datos, asociada al usuario actual y al proyecto especificado.
     """
     user_id = get_current_user_id(credentials.credentials)
-    check_user_in_project(data.id_proyecto, user_id)
+    check_user_in_project(id_proyecto, user_id)
 
     query = """
-        INSERT INTO tarea (titulo_tarea, descripcion_tarea, estado_tarea, fecha_limite_tarea, id_proyecto, id_usuario)
+        INSERT INTO Tarea (titulo_tarea, descripcion_tarea, estado_tarea, fecha_limite_tarea, id_proyecto, id_usuario)
         VALUES (%s, %s, %s, %s, %s, %s)
     """
     try:
@@ -67,7 +68,7 @@ def create_task(
                 data.descripcion_tarea,
                 data.estado_tarea,
                 data.fecha_limite_tarea,
-                data.id_proyecto,
+                id_proyecto,
                 user_id
             )
         )
@@ -124,7 +125,7 @@ def update_tarea(id_tarea: int, tarea: TareaUpdate, credentials: HTTPAuthorizati
         params.append(value)
     if not updates:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nada que actualizar")
-    query = f"UPDATE tarea SET {', '.join(updates)} WHERE id_tarea = %s"
+    query = f"UPDATE Tarea SET {', '.join(updates)} WHERE id_tarea = %s"
     params.append(id_tarea)
     execute_query(query, tuple(params), commit=True)
     return {"message": f"Tarea {id_tarea} actualizada correctamente"}
