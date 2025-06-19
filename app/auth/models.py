@@ -16,7 +16,8 @@ class UserRegister(BaseModel):
     """
     Modelo para el registro de un nuevo usuario.
     """
-    nombre_usuario: str
+    nombre: str
+    apellido: str
     correo_usuario: str
     clave_usuario: str
 

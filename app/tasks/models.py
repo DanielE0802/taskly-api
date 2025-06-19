@@ -28,7 +28,6 @@ class ResponsableOut(BaseModel):
     id_usuario: Optional[int] = None
     nombre: Optional[str] = None
 class TareaCreate(TareaBase):
-    id_usuario: int
     id_responsable: Optional[int] = None
 
 class TareaUpdate(BaseModel):

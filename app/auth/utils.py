@@ -83,13 +83,14 @@ class BearerJWT(HTTPBearer):
         verify_token(credentials.credentials)
         return credentials
     
+# TODO: revisar si es necesario este método, ya que se puede obtener el ID del usuario directamente desde el token
 def get_current_user_id(token: str):
     """
     Obtiene el ID del usuario actual a partir del token JWT.
     """
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     query = "SELECT id_usuario FROM Usuario WHERE correo_usuario = %s"
-    result = execute_query(query, (payload.get("sub"),), fetchone=True)
+    result = execute_query(query, (payload.get("email"),), fetchone=True)
     if result is None:
         raise HTTPException(status_code=404, detail="User not found")
     user_id = result["id_usuario"]
