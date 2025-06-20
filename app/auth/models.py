@@ -34,3 +34,19 @@ class Token(BaseModel):
     """
     access_token: str
     token_type: str = "bearer"
+
+class ResetPasswordRequest(BaseModel):
+    """
+    Modelo para la solicitud de restablecimiento de contraseña.
+    Contiene el correo del usuario y el código de verificación.
+    """
+    correo_usuario: str
+
+class ResetConfirm(BaseModel):
+    """
+    Modelo para la respuesta de restablecimiento de contraseña.
+    Contiene el mensaje de éxito o error.
+    """
+    email: str
+    code: str
+    new_password: str
