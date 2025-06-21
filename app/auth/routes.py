@@ -11,7 +11,6 @@ from fastapi import Request
 
 router = APIRouter()
 
-# Ruta de registro de usuario
 @router.post("/register")
 async def register_user(user: models.UserRegister):
     """Registra un nuevo usuario en la base de datos."""
@@ -20,10 +19,8 @@ async def register_user(user: models.UserRegister):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Hashear la contraseña
     hashed_password = hash_password(user.clave_usuario)
 
-    # Insertar el usuario en la base de datos
     query = "INSERT INTO Usuario (id_usuario, nombre_usuario, correo_usuario, clave_usuario) VALUES (%s, %s, %s, %s)"
     try:
         execute_update(query, (None, user.nombre, user.correo_usuario, hashed_password))
@@ -37,7 +34,6 @@ async def register_user(user: models.UserRegister):
 
     return {"message": "User registered successfully"}
 
-# Ruta de login
 @router.post("/login")
 def login_for_access_token(user: models.UserLogin) -> models.Token:
     """Inicia sesión y devuelve un token de acceso."""
@@ -68,11 +64,28 @@ async def send_reset_code(data: models.ResetPasswordRequest, request: Request):
     await send_reset_email(data.correo_usuario, code, 'reset_password_email.html', {"code": code}, subject="Restablecimiento de contraseña")
     return {"message": "Código enviado al correo"}
 
+@router.get("/verify-code")
+@limiter.limit("5/minute")
+def verify_reset_code(data: models.validateResetCode):
+    """Verifica el código de restablecimiento de contraseña."""
+    user = execute_query(
+        "SELECT id_usuario, reset_token, reset_token_expiry FROM Usuario WHERE correo_usuario = %s",
+        (data.correo_usuario,), fetchone=True
+    )
+    if not user or user["reset_token"] != data.code:
+        raise HTTPException(status_code=400, detail="Código inválido")
+    
+    if datetime.utcnow() > user["reset_token_expiry"]:
+        raise HTTPException(status_code=400, detail="El código ha expirado")
+    
+    return {"message": "Código verificado correctamente"}
+
 @router.post("/reset-password")
+@limiter.limit("5/minute")
 def reset_password(data: models.ResetConfirm):
     user = execute_query(
         "SELECT id_usuario, reset_token, reset_token_expiry FROM Usuario WHERE correo_usuario = %s",
-        (data.email,), fetchone=True
+        (data.correo_usuario,), fetchone=True
     )
     if not user or user["reset_token"] != data.code:
         raise HTTPException(status_code=400, detail="Código inválido")
@@ -83,7 +96,7 @@ def reset_password(data: models.ResetConfirm):
     password = hash_password(data.new_password)
 
     execute_update("UPDATE Usuario SET clave_usuario = %s, reset_token = NULL, reset_token_expiry = NULL WHERE correo_usuario = %s",
-                   (password, data.email))
+                   (password, data.correo_usuario))
 
     return {"message": "Contraseña actualizada correctamente"}
 

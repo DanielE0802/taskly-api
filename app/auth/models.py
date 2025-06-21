@@ -42,11 +42,18 @@ class ResetPasswordRequest(BaseModel):
     """
     correo_usuario: str
 
+class validateResetCode(BaseModel):
+    """
+    Modelo para validar el código de restablecimiento de contraseña.
+    Contiene el correo del usuario y el código de verificación.
+    """
+    correo_usuario: str
+    code: str
 class ResetConfirm(BaseModel):
     """
     Modelo para la respuesta de restablecimiento de contraseña.
     Contiene el mensaje de éxito o error.
     """
-    email: str
+    correo_usuario: str
     code: str
     new_password: str
