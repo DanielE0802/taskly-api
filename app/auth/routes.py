@@ -13,7 +13,7 @@ router = APIRouter()
 
 # Ruta de registro de usuario
 @router.post("/register")
-def register_user(user: models.UserRegister):
+async def register_user(user: models.UserRegister):
     """Registra un nuevo usuario en la base de datos."""
     query = "SELECT * FROM Usuario WHERE correo_usuario = %s"
     existing_user = execute_query(query, (user.correo_usuario,), fetchone=True)
@@ -29,6 +29,11 @@ def register_user(user: models.UserRegister):
         execute_update(query, (None, user.nombre, user.correo_usuario, hashed_password))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+    try:
+        await send_reset_email(user.correo_usuario,'welcome_template.html', {"nombre": user.nombre} , subject="Registro exitoso")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error sending welcome email: {str(e)}")
 
     return {"message": "User registered successfully"}
 
@@ -60,7 +65,7 @@ async def send_reset_code(data: models.ResetPasswordRequest, request: Request):
         (code, expiry, data.correo_usuario)
     )
 
-    await send_reset_email(data.correo_usuario, code)
+    await send_reset_email(data.correo_usuario, code, 'reset_password_email.html', {"code": code}, subject="Restablecimiento de contraseña")
     return {"message": "Código enviado al correo"}
 
 @router.post("/reset-password")
